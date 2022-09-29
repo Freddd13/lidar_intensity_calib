@@ -35,6 +35,8 @@ int main(int argc, char** argv) {
 
   // read cloud
   Calibrator<KPointXYZIN> calibrator(&params);
-  calibrator.LoadCloud();
+  calibrator.Init();
+  calibrator.Run();
+  
   return 0;
 }

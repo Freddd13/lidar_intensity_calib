@@ -8,3 +8,4 @@ max_distance: 30
 # 
 std_var: 1
 eps: 0.1
+max_intensity: 100

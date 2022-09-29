@@ -1,12 +1,15 @@
 /***
  * @Date: 2022-09-27 20:25:58
  * @LastEditors: Freddd13
- * @LastEditTime: 2022-09-27 20:41:15
+ * @LastEditTime: 2022-09-29 19:13:19
  * @Description:
  * @yzdyzd13@gmail.com
  */
 #pragma once
 #include "intensity_calibration/kumo_algorithms.h"
+#include "model/beam_model.h"
+#include "model/cell_model.h"
+#include "model/mesurement.h"
 #include "params.hpp"
 
 template <class PointType>
@@ -16,11 +19,24 @@ class Calibrator {
   Calibrator(Params* params);
   ~Calibrator();
   void LoadCloud();
+  void Init();
+  Measurements LoadMeasurement(float voxel_size);
+  void InitCellModel();
+  void InitBeamModel();
+
+  void Run();
+  double EStep();
+  double MStep();
 
  private:
   typename pcl::PointCloud<PointType>::Ptr cloud_;
   // boost::shared_ptr<Params> params_;
   Params* params_;
+  Measurements measurments_;
+  BeamModels beam_models_;
+  CellModels cell_models_;
+  int num_beams_ = 0;
+  int num_voxels_ = 0;
 };
 
 // constructor
@@ -41,13 +57,190 @@ template <class PointType>
 void Calibrator<PointType>::LoadCloud() {
   typename pcl::PointCloud<PointType>::Ptr cloud(new pcl::PointCloud<PointType>);
   pcl::io::loadPCDFile(params_->pcd_path_, *cloud);
-  //TODO check fields
-  //TODO why downsample not working???
+  // TODO check fields
+  // TODO why downsample not working???
   pcl::copyPointCloud(*cloud, *cloud_);
-  // for(auto &pt : cloud->points) {
-  //   if (pt.normal_y <= params_->max_distance_) {  // for XYZIN, normal_x -> scan_id, normal_y ->distance
-  //     cloud_->push_back(pt);
-  //   }
-  // }
+  for (auto& pt : cloud->points) {
+    // if (pt.normal_y <= params_->max_distance_) {  // for XYZIN, normal_x -> scan_id, normal_y ->distance
+    //   cloud_->push_back(pt);
+    // }
+    if (pt.intensity <= params_->max_intensity_) {
+      cloud_->push_back(pt);
+    }
+    num_beams_ = std::max(num_beams_, (int)pt.normal_x);
+  }
   LOG(INFO) << "Num of points read from pcd: " << cloud->size() << ", keep " << cloud_->size();
+  LOG(INFO) << "Num of beams: " << ++num_beams_;
+}
+
+// Init. Read Measurement and init models
+template <class PointType>
+void Calibrator<PointType>::Init() {
+  this->LoadCloud();
+  measurments_ = this->LoadMeasurement(params_->voxel_size_);
+  this->InitCellModel();
+  this->InitBeamModel();
+  // LOG(INFO) << "Num of points read from pcd: " << cloud->size() << ", keep " << cloud_->size();
+}
+
+// load measurments
+template <class PointType>
+Measurements Calibrator<PointType>::LoadMeasurement(float voxel_size) {
+  // Put in bins
+  pcl::VoxelGrid<PointType> grid;
+  grid.setInputCloud(cloud_);
+  grid.setLeafSize(voxel_size, voxel_size, voxel_size);
+  grid.setSaveLeafLayout(true);
+  grid.setDownsampleAllData(false);
+  typename pcl::PointCloud<PointType>::Ptr tmpcloud(new pcl::PointCloud<PointType>);
+  grid.filter(*tmpcloud);
+
+  // Now put in measurement
+  Measurements results;
+  // std::vector<size_t> counter(257,0);
+  for (const auto pt : cloud_->points) {
+    int a = static_cast<int>(pt.intensity);
+    int b = static_cast<int>(pt.normal_x);
+    int k = grid.getCentroidIndexAt(grid.getGridCoordinates(pt.x, pt.y, pt.z));
+    if (a >= params_->max_intensity_) {
+      continue;
+    }
+    CHECK(k >= 0) << "Did not find corresponding voxel";
+    CHECK(a <= params_->max_intensity_ && a >= 0) << "Measured intensity is wrong value";
+    CHECK(b >= 0) << "Beam id is wrong";
+    results.emplace_back(a, b, k);
+  }
+  LOG(INFO) << "Gathered measurements " << results.size();
+  cloud_.swap(tmpcloud);
+
+  return results;
+}
+
+// cell model
+template <class PointType>
+void Calibrator<PointType>::InitCellModel() {
+  cell_models_.resize(cloud_->size());
+  for (auto& cell_model : cell_models_) {
+    cell_model = Eigen::Matrix<double, Eigen::Dynamic, 1>();
+    cell_model.resize(params_->max_intensity_, 1);
+    cell_model.setOnes();
+    cell_model = cell_model / params_->max_intensity_;
+    // LOG(INFO) << cell_model.transpose();
+  }
+
+  LOG(INFO) << "Init CellModel";
+}
+
+// beam model
+template <class PointType>
+void Calibrator<PointType>::InitBeamModel() {
+  // vlp16 for example:
+  // 16 beams, each beam has 255 original value, each value has 255 possible real value
+  // Here, assuming given original value == map value == "m", m * a -> 255 * 255
+  for (int i = 0; i < num_beams_; i++) {
+    beam_models_.emplace_back(params_->max_intensity_, params_->std_var_, params_->eps_);
+  }
+  LOG(INFO) << "Init BeamModel";
+}
+
+///// EM /////
+// E step
+template <class PointType>
+double Calibrator<PointType>::EStep() {
+  LOG(INFO) << "E Step, update voxel models";
+  auto buffered = cell_models_;
+  for (auto& cell_model : cell_models_) cell_model.setZero();
+  for (const auto& m : measurments_) {
+    cell_models_.at(m.k) += beam_models_.at(m.b).atLog(m.a);
+  }
+
+  for (auto& cell_model : cell_models_) {
+    Eigen::MatrixXd::Index max_intensity, mmm;
+    auto val = cell_model.maxCoeff(&max_intensity, &mmm);  // 对于这个cell,最有可能的Intensity的概率值
+    // LOG(INFO) << "most prob i: " << mmm << " prob: " << val;
+    for (int i = 0; i < params_->max_intensity_; i++) {
+      cell_model(i) = std::exp(cell_model(i));
+    }
+  }
+
+  double diff = 0.0;
+  for (int i = 0; i < cell_models_.size(); i++) {
+    // LOG(INFO) << "sum " << cell_model.at(i).sum();
+    // LOG(INFO) << "sum " << cell_model.at(i).transpose();
+    if (cell_models_.at(i).sum() == 0) {
+      LOG(INFO) << "empty, pass";
+    } else {
+      cell_models_.at(i) /= cell_models_.at(i).sum();  // 归一化
+    }
+    double err = (cell_models_.at(i) - buffered.at(i)).norm();
+    diff += err;
+  }
+
+  double res = diff / cell_models_.size();
+  LOG(WARNING) << "Current E STEP averaged error" << res;
+  return res;
+}
+
+// M step
+template <class PointType>
+double Calibrator<PointType>::MStep() {
+  LOG(INFO) << "M Step, update beam models";
+  auto buffered = beam_models_;
+  BeamCountings countings(beam_models_.size());
+  for (auto& counting : countings) {
+    counting = BeamCounting(params_->max_intensity_, params_->max_intensity_);
+    counting.setZero();
+  }
+  for (const auto& m : measurments_) {
+    countings.at(m.b).col(m.a) += cell_models_.at(m.k);
+  }
+  double diff = 0;
+  for (int i = 0; i < countings.size(); i++) {
+    CHECK_EQ(countings.at(i).rows(), params_->max_intensity_);
+    beam_models_.at(i) = BeamModel(countings.at(i));
+    diff += (beam_models_.at(i).probability_ - buffered.at(i).probability_).norm();
+  }
+
+  double res = diff / countings.size();
+  LOG(WARNING) << "Current M STEP averaged error" << res;
+  return res;
+}
+
+// run calib!!!
+template <class PointType>
+void Calibrator<PointType>::Run() {
+  LOG(INFO) << "Start Calib!!!";
+  int count = 0;
+  while (EStep() > 1e-7 && count < 100) {
+    MStep();
+    count ++;
+    // double error = m_step();
+  //   saveProbability("./" + std::to_string(count) + ".txt", beam_model);
+    
+  //   BeamMappings res;
+  //   for (const auto& beam : beam_model) {
+  //     res.emplace_back(beam.getMapping());
+  //     // LOG(INFO) << beam.getMapping();
+  //   }
+  //   saveMappings("/home/yxt/code/slam/remittance_calib_ws/src/Remittance-Calibration/" + std::to_string(count) + ".txt",
+  //                res);
+  // }
+  // BeamMappings res;
+  // for (const auto& beam : beam_model) {
+  //   res.emplace_back(beam.getMapping());
+  // }
+  // return res;
+  }
+  BeamMappings mappings;
+  for (const auto& beam_model : beam_models_) {
+    mappings.emplace_back(beam_model.GetMapping());
+  }
+  auto filename = "./calib_res.txt";
+  std::ofstream file(filename);
+  if (file.is_open()) {
+    file << mappings.size() << " " << mappings.at(0).cols() << "\n";
+    for (const auto mapping : mappings) {
+      file << mapping << '\n';
+    }
+  }
 }

@@ -17,6 +17,7 @@ struct Params {
     voxel_size_ = config["voxel_size"].as<float>();
     std_var_ = config["std_var"].as<float>();
     eps_ = config["eps"].as<float>();
+    max_intensity_ = config["max_intensity"].as<int>();
   }
   // ~Params() {}
 
@@ -27,4 +28,5 @@ struct Params {
   float max_distance_;
   float std_var_;
   float eps_;
+  int max_intensity_;
 };
