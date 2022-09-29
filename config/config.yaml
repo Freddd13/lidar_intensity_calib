@@ -6,6 +6,6 @@ pcd_path: /home/yxt/code/slam/intensity_calib_fred_ws/src/intensity_calibration/
 voxel_size: 0.4
 max_distance: 30
 # 
-std_var: 1
-eps: 0.1
+std_var: 1.2
+eps: 0.05
 max_intensity: 100

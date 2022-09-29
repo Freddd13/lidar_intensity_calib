@@ -211,25 +211,10 @@ template <class PointType>
 void Calibrator<PointType>::Run() {
   LOG(INFO) << "Start Calib!!!";
   int count = 0;
-  while (EStep() > 1e-7 && count < 100) {
+  while (EStep() > 1e-7 && count < 1000) {
     MStep();
-    count ++;
-    // double error = m_step();
-  //   saveProbability("./" + std::to_string(count) + ".txt", beam_model);
-    
-  //   BeamMappings res;
-  //   for (const auto& beam : beam_model) {
-  //     res.emplace_back(beam.getMapping());
-  //     // LOG(INFO) << beam.getMapping();
-  //   }
-  //   saveMappings("/home/yxt/code/slam/remittance_calib_ws/src/Remittance-Calibration/" + std::to_string(count) + ".txt",
-  //                res);
-  // }
-  // BeamMappings res;
-  // for (const auto& beam : beam_model) {
-  //   res.emplace_back(beam.getMapping());
-  // }
-  // return res;
+    LOG(INFO) << "============"
+              << "epoch " << count << "============" << count++;
   }
   BeamMappings mappings;
   for (const auto& beam_model : beam_models_) {
@@ -238,7 +223,7 @@ void Calibrator<PointType>::Run() {
   auto filename = "./calib_res.txt";
   std::ofstream file(filename);
   if (file.is_open()) {
-    file << mappings.size() << " " << mappings.at(0).cols() << "\n";
+    // file << mappings.size() << " " << mappings.at(0).cols() << "\n";
     for (const auto mapping : mappings) {
       file << mapping << '\n';
     }
