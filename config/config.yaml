@@ -9,3 +9,5 @@ max_distance: 30
 std_var: 1.2
 eps: 0.05
 max_intensity: 100
+value_converge: 1e-7
+save_loss_value: false

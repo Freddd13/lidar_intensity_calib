@@ -7,10 +7,10 @@
  */
 #pragma once
 #include "intensity_calibration/kumo_algorithms.h"
-#include "model/beam_model.h"
-#include "model/cell_model.h"
-#include "model/mesurement.h"
-#include "params.hpp"
+#include "intensity_calibration/core/beam_model.hpp"
+#include "intensity_calibration/core/cell_model.h"
+#include "intensity_calibration/core/mesurement.h"
+#include "intensity_calibration/params.hpp"
 
 template <class PointType>
 class Calibrator {
@@ -24,9 +24,10 @@ class Calibrator {
   void InitCellModel();
   void InitBeamModel();
 
-  void Run();
+  BeamMappings Run();
   double EStep();
   double MStep();
+  void SaveCalibResult(BeamMappings mappings);
 
  private:
   typename pcl::PointCloud<PointType>::Ptr cloud_;
@@ -208,24 +209,47 @@ double Calibrator<PointType>::MStep() {
 
 // run calib!!!
 template <class PointType>
-void Calibrator<PointType>::Run() {
-  LOG(INFO) << "Start Calib!!!";
-  int count = 0;
-  while (EStep() > 1e-7 && count < 1000) {
-    MStep();
-    LOG(INFO) << "============"
-              << "epoch " << count << "============" << count++;
-  }
-  BeamMappings mappings;
-  for (const auto& beam_model : beam_models_) {
-    mappings.emplace_back(beam_model.GetMapping());
-  }
-  auto filename = "./calib_res.txt";
-  std::ofstream file(filename);
+void Calibrator<PointType>::SaveCalibResult(BeamMappings mappings) {
+  std::string::size_type iPos = (params_->pcd_path_).find_last_of('/') + 1;
+  std::string filename_pcd = (params_->pcd_path_).substr(iPos, (params_->pcd_path_).length() - iPos);
+  filename_pcd = filename_pcd.substr(0, filename_pcd.rfind("."));
+
+  // round(x * 100) / 100.0.
+  auto name_prefix = params_->result_path_;
+  auto name_pcd_in_res = filename_pcd;
+  auto name_voxel = "_voxel" + std::to_string(round(params_->voxel_size_ * 100)/ 100.0);
+  auto name_dis = "_dis" + std::to_string(round(params_->max_distance_ * 100) / 100.0);
+  auto name_intensity = "_intensity" + std::to_string(round(params_->max_intensity_ * 100) / 100.0);
+  auto name_var = "_var" + std::to_string(round(params_->std_var_ * 100) / 100.0);
+  auto name_eps = "_eps" + std::to_string(round(params_->eps_ * 100) / 100.0);
+  auto name_loss = "_loss" + std::to_string(params_->value_converge_);
+  auto name_suffix = ".txt";
+
+  auto filename_res = name_prefix + name_pcd_in_res + name_voxel + name_dis + name_intensity + name_var + name_eps +
+                      name_loss + name_suffix;
+  std::ofstream file(filename_res);
   if (file.is_open()) {
     // file << mappings.size() << " " << mappings.at(0).cols() << "\n";
     for (const auto mapping : mappings) {
       file << mapping << '\n';
     }
   }
+}
+
+// run calib!!!
+template <class PointType>
+BeamMappings Calibrator<PointType>::Run() {
+  LOG(INFO) << "Start Calib!!!";
+  int count = 0;
+  while (EStep() > params_->value_converge_ && count < 1000) {
+    MStep();
+    LOG(INFO) << "============"
+              << "epoch " << count << "============";
+    count++;
+  }
+  BeamMappings mappings;
+  for (const auto& beam_model : beam_models_) {
+    mappings.emplace_back(beam_model.GetMapping());
+  }
+  return mappings;
 }

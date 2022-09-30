@@ -1,7 +1,6 @@
 #pragma once
 #include "intensity_calibration/kumo_algorithms.h"
 #include "cell_model.h"
-#include "beam_model.h"
 
 using BeamMapping = Eigen::RowVectorXi;  //< Map to 0 till 255
 

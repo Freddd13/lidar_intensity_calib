@@ -1,13 +1,13 @@
 /*** 
  * @Date: 2022-09-27 21:44:18
  * @LastEditors: Freddd13
- * @LastEditTime: 2022-09-27 22:30:47
+ * @LastEditTime: 2022-09-30 11:05:25
  * @Description: 
  * @yzdyzd13@gmail.com
  */
 
 #include "intensity_calibration/kumo_algorithms.h"
-#include "../src/params.hpp"
+#include "intensity_calibration/params.hpp"
 
 int main(int argc, char** argv) {
   // init gflags

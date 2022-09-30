@@ -18,6 +18,7 @@ struct Params {
     std_var_ = config["std_var"].as<float>();
     eps_ = config["eps"].as<float>();
     max_intensity_ = config["max_intensity"].as<int>();
+    value_converge_ = config["value_converge"].as<float>();
   }
   // ~Params() {}
 
@@ -28,5 +29,6 @@ struct Params {
   float max_distance_;
   float std_var_;
   float eps_;
+  float value_converge_;
   int max_intensity_;
 };

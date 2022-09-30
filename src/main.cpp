@@ -8,9 +8,9 @@
 
 // #include <ros/package.h>
 
+#include "intensity_calibration/calibrator.hpp"
 #include "intensity_calibration/kumo_algorithms.h"
-#include "params.hpp"
-#include "calibrator.hpp"
+#include "intensity_calibration/params.hpp"
 
 int main(int argc, char** argv) {
   // init gflags
@@ -36,7 +36,8 @@ int main(int argc, char** argv) {
   // read cloud
   Calibrator<KPointXYZIN> calibrator(&params);
   calibrator.Init();
-  calibrator.Run();
-  
+  BeamMappings mappings = calibrator.Run();
+  calibrator.SaveCalibResult(mappings);
+
   return 0;
 }

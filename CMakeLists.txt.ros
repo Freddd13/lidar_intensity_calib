@@ -57,7 +57,6 @@ include_directories(
 
 add_executable(calib 
   src/main.cpp
-  src/params.cpp
   )
 target_link_libraries(calib ${catkin_LIBRARIES} ${YAML_CPP_LIBRARIES} ${PCL_LIBRARIES} ${GFLAGS_LIBRARIES} ${GLOG_LIBRARIES})
 # target_link_libraries(k_lidar_preprocess seg ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${GLOG_LIBRARIES})
