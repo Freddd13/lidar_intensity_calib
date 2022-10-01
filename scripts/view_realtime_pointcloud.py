@@ -1,7 +1,7 @@
 '''
 Date: 2022-10-01 20:03:03
 LastEditors: Freddd13
-LastEditTime: 2022-10-01 22:30:57
+LastEditTime: 2022-10-01 22:53:01
 Description: 
 yzdyzd13@gmail.com
 '''
@@ -58,7 +58,7 @@ if __name__ == "__main__":
     calibed_pc_puber = rospy.Publisher('/calibed_pc', PointCloud2, queue_size=2)
 
     # read calib file
-    url_calib_file = "/home/yxt/code/slam/intensity_calib_fred_ws/src/intensity_calibration/results/test_uniform_0.1_voxel0.400000_dis0.000000_intensity100.000000_var0.500000_eps0.050000_loss0.000000.txt"
+    url_calib_file = "/home/yxt/code/slam/intensity_calib_fred_ws/src/intensity_calibration/results/full_cloud_voxel0.200000_dis0.000000_intensity100.000000_var0.500000_eps0.050000_loss0.000001.txt"
     num_beams = 16
     num_calib_intensity = 100
     calib_data = np.loadtxt(url_calib_file)

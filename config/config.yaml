@@ -3,7 +3,7 @@ result_path: /home/yxt/code/slam/intensity_calib_fred_ws/src/intensity_calibrati
 # poincloud
 # pcd_path: /home/yxt/code/slam/intensity_calib_fred_ws/src/intensity_calibration/sample/test_uniform_0.1.pcd
 pcd_path: /home/yxt/code/slam/kumo_slam_ws/src/kumo_slam/results/full_cloud.pcd
-voxel_size: 0.2
+voxel_size: 0.3
 max_distance: 30
 # 
 std_var: 0.5

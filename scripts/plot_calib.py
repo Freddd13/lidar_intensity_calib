@@ -1,7 +1,7 @@
 '''
 Date: 2022-09-29 23:10:32
 LastEditors: Freddd13
-LastEditTime: 2022-10-01 20:02:15
+LastEditTime: 2022-10-01 23:19:19
 Description: 
 yzdyzd13@gmail.com
 '''
@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
     # read calib file
-    url_calib_file = "/home/yxt/code/slam/intensity_calib_fred_ws/src/intensity_calibration/results/test_uniform_0.1_voxel0.200000_dis0.000000_intensity100.000000_var0.300000_eps0.050000_loss0.000000.txt"
+    url_calib_file = "/home/yxt/code/slam/intensity_calib_fred_ws/src/intensity_calibration/results/full_cloud_voxel0.200000_dis0.000000_intensity100.000000_var0.500000_eps0.050000_loss0.000001.txt"
     num_beams = 16
     num_calib_intensity = 100
     calib_data = np.loadtxt(url_calib_file)
