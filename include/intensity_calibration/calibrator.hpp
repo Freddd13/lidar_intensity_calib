@@ -6,10 +6,10 @@
  * @yzdyzd13@gmail.com
  */
 #pragma once
-#include "intensity_calibration/model/mesurement.h"
 #include "intensity_calibration/kumo_algorithms.h"
 #include "intensity_calibration/model/beam_model.hpp"
 #include "intensity_calibration/model/cell_model.h"
+#include "intensity_calibration/model/mesurement.h"
 #include "intensity_calibration/params.hpp"
 
 template <class PointType>
@@ -38,6 +38,8 @@ class Calibrator {
   CellModels cell_models_;
   int num_beams_ = 0;
   int num_voxels_ = 0;
+  std::vector<double> loss_e_;
+  std::vector<double> loss_m_;
 };
 
 // constructor
@@ -155,15 +157,29 @@ double Calibrator<PointType>::EStep() {
     cell_models_.at(m.k) += beam_models_.at(m.b).atLog(m.a);
   }
 
-  for (auto& cell_model : cell_models_) {
-    // Eigen::MatrixXd::Index max_intensity, mmm;
-    // auto val = cell_model.maxCoeff(&max_intensity, &mmm);  // 对于这个cell,最有可能的Intensity的概率值
-    // LOG(INFO) << "most prob i: " << mmm << " prob: " << val;
-    for (int i = 0; i < params_->max_intensity_; i++) {
-      cell_model(i) = std::exp(cell_model(i));
+  if (params_->use_original_em_) {
+    // original from Guo.
+    for (auto& cell_model : cell_models_) {
+      auto val = cell_model.maxCoeff();
+      for (int i = 0; i < params_->max_intensity_; i++) {
+        if (cell_model(i) - val >= std::log(params_->original_em_precision_) - std::log(params_->max_intensity_)) {
+          cell_model(i) = std::exp(cell_model(i) - val);
+        } else {
+          cell_model(i) = 0;
+        }
+      }
+    }
+  } else {
+    // simple
+    for (auto& cell_model : cell_models_) {
+      // Eigen::MatrixXd::Index max_intensity, mmm;
+      // auto val = cell_model.maxCoeff(&max_intensity, &mmm);  // 对于这个cell,最有可能的Intensity的概率值
+      // LOG(INFO) << "most prob i: " << mmm << " prob: " << val;
+      for (int i = 0; i < params_->max_intensity_; i++) {
+        cell_model(i) = std::exp(cell_model(i));
+      }
     }
   }
-
   double diff = 0.0;
   for (uint i = 0; i < cell_models_.size(); i++) {
     // LOG(INFO) << "sum " << cell_model.at(i).sum();
@@ -178,7 +194,8 @@ double Calibrator<PointType>::EStep() {
   }
 
   double res = diff / cell_models_.size();
-  LOG(WARNING) << "Current E STEP averaged error" << res;
+  loss_e_.push_back(res);
+   LOG(WARNING) << "Current E STEP averaged error" << res;
   return res;
 }
 
@@ -203,6 +220,7 @@ double Calibrator<PointType>::MStep() {
   }
 
   double res = diff / countings.size();
+  loss_m_.push_back(res);
   LOG(WARNING) << "Current M STEP averaged error" << res;
   return res;
 }
@@ -217,7 +235,7 @@ void Calibrator<PointType>::SaveCalibResult(BeamMappings mappings) {
   // round(x * 100) / 100.0.
   auto name_prefix = params_->result_path_;
   auto name_pcd_in_res = filename_pcd;
-  auto name_voxel = "_voxel" + std::to_string(round(params_->voxel_size_ * 100)/ 100.0);
+  auto name_voxel = "_voxel" + std::to_string(round(params_->voxel_size_ * 100) / 100.0);
   auto name_dis = "_dis" + std::to_string(round(params_->max_distance_ * 100) / 100.0);
   auto name_intensity = "_intensity" + std::to_string(round(params_->max_intensity_ * 100) / 100.0);
   auto name_var = "_var" + std::to_string(round(params_->std_var_ * 100) / 100.0);
@@ -234,6 +252,19 @@ void Calibrator<PointType>::SaveCalibResult(BeamMappings mappings) {
       file << mapping << '\n';
     }
   }
+
+  auto filename_loss = name_prefix + "loss.txt";
+  std::ofstream file_loss(filename_loss);
+  if (file_loss.is_open()) {
+    // file << mappings.size() << " " << mappings.at(0).cols() << "\n";
+    for (const auto loss : loss_m_) {
+      file_loss << " " << loss;
+    }
+    file_loss << std::endl;
+    for (int i = 0; i< (int)loss_m_.size(); i++) {
+      file_loss << " " << loss_e_.at(i);
+    }
+  }
 }
 
 // run calib!!!
@@ -241,7 +272,7 @@ template <class PointType>
 BeamMappings Calibrator<PointType>::Run() {
   LOG(INFO) << "Start Calib!!!";
   int count = 0;
-  while (EStep() > params_->value_converge_ && count < 1000) {
+  while (EStep() > params_->value_converge_ && count < params_->max_em_epoch_) {
     MStep();
     LOG(INFO) << "============"
               << "epoch " << count << "============";

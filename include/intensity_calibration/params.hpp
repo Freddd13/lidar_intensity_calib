@@ -19,6 +19,9 @@ struct Params {
     eps_ = config["eps"].as<float>();
     max_intensity_ = config["max_intensity"].as<int>();
     value_converge_ = config["value_converge"].as<float>();
+    use_original_em_ = config["use_original_em"].as<bool>();
+    original_em_precision_ = config["original_em_precision"].as<double>();
+    max_em_epoch_ = config["max_em_epoch"].as<int>();
   }
   // ~Params() {}
 
@@ -31,4 +34,7 @@ struct Params {
   float eps_;
   float value_converge_;
   int max_intensity_;
+  bool use_original_em_;
+  double original_em_precision_;
+  int max_em_epoch_;
 };
